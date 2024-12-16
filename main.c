@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include "consts.h"
+#include <termios.h>
+#include <fcntl.h>
 
 
 #define CS_RL_BUFFER_SIZE 1024;
@@ -40,13 +42,61 @@ int cs_num_builtins() {
 
 int main(int argc, char **argv) {
     // Load config files, if any.
+    printf("%s\n", msg);
+    printf("Welcome to ₵Shell! Hit any key to continue...\n");
+
+    while (!kbhit()) {
+        // ???
+    }
+    getchar();
+    clear_screen();
 
     // Run command loop.
     process_loop();
 
+
     // Perform any shutdown/cleanup.
+    clear_screen();
 
     return EXIT_SUCCESS;
+}
+
+void clear_screen() {
+    // ANSI escape sequence to clear the screen
+    printf("\033[H\033[J");
+    fflush(stdout);  // Ensure the buffer is flushed to stdout
+}
+
+// Non-blocking key press detection
+int kbhit(void) {
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+
+    // Get current terminal settings
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);  // Disable canonical mode and echo
+    newt.c_cc[VMIN] = 1;  // Minimum characters to read
+    newt.c_cc[VTIME] = 0;  // Timeout for reading
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);  // Apply new settings
+
+    // Set terminal to non-blocking mode
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);  // Set non-blocking mode
+
+    ch = getchar();  // Try to read a character from stdin
+
+    // Restore original terminal settings
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);  // Restore file status flags
+
+    if (ch != EOF) {
+        ungetc(ch, stdin);  // Put the character back in the buffer
+        return 1;  // A key was pressed
+    }
+
+    return 0;  // No key was pressed
 }
 
 void process_loop() {
@@ -97,14 +147,14 @@ char *cs_readline() {
             buffsize += CS_RL_BUFFER_SIZE;
             buffer = realloc(buffer, buffsize);
             check_buffer(buffer);
-            printf("!C$ ALERT! ::: !MEMORY BUFFER EXCEEDED! :::\n");
+            printf("!₵ ALERT! ::: !MEMORY BUFFER EXCEEDED! :::\n");
         }
     }
 }
 
 void check_buffer (const char *buffer) {
     if (!buffer) {
-        fprintf(stderr,"C$: !Memory Allocation Error!");
+        fprintf(stderr,"₵: !Memory Allocation Error!");
         exit(EXIT_FAILURE);
     }
 }
@@ -135,6 +185,7 @@ char **cs_split_lines(char *line) {
 }
 
 int cs_launch(char **args) {
+    printf("Falling through to main shell...\n");
     pid_t pid, wpid;
     int status;
 
@@ -176,7 +227,7 @@ int cs_execute(char **args) {
 
 int cs_cd(char **args) {
     if (args[1] == NULL) {
-        fprintf(stderr, "cs: expected argument to \"cd\"\n");
+        fprintf(stderr, "cshell: expected argument to \"cd\"\n");
     } else {
         if (chdir(args[1]) != 0) {
             perror("cs");
@@ -189,7 +240,7 @@ int cs_help(char **args)
 {
     int i;
     printf("%s\n", msg);
-    printf("Type program names and arguments, and hit enter.\n");
+    printf("Welcome to ₵Shell.\n");
     printf("The following are built in:\n");
 
     for (i = 0; i < cs_num_builtins(); i++) {
