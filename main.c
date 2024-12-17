@@ -27,6 +27,8 @@ int cs_execute(char **args);
 int cs_cd(char **args);
 int cs_help(char **args);
 int cs_exit(char **args);
+void clear_screen(void);
+int kbhit(void);
 
 char *builtin_str[] = {"cd", "help", "exit"};
 int (*builtin_func[]) (char **) = {
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
     printf("Welcome to ₵Shell! Hit any key to continue...\n");
 
     while (!kbhit()) {
-        // ???
+        // awaiting keyboard input which clears the screen & displaying prompt
     }
     getchar();
     clear_screen();
@@ -106,9 +108,9 @@ void process_loop() {
 
     do {
         printf("₵ > ");
-        line = cs_readline();
-        args = cs_split_lines(line);
-        status = cs_execute(args);
+        line = cs_readline(); // read line from input
+        args = cs_split_lines(line); // split / tokenize the line
+        status = cs_execute(args); // execute parsed input
 
         free(line);
         free(args);
@@ -117,10 +119,7 @@ void process_loop() {
 
 }
 
-/*
- * the `readline()` function provided by stdio.h would make the below function much simpler.
- * an implementation using it can be seen at the end of this file
- */
+// readline could make this a whole lot simpler
 char *cs_readline() {
     int buffsize = CS_RL_BUFFER_SIZE; // initial buffer size
     int position = 0;
@@ -147,11 +146,12 @@ char *cs_readline() {
             buffsize += CS_RL_BUFFER_SIZE;
             buffer = realloc(buffer, buffsize);
             check_buffer(buffer);
-            printf("!₵ ALERT! ::: !MEMORY BUFFER EXCEEDED! :::\n");
+            // printf("!₵ ALERT! ::: !MEMORY BUFFER EXCEEDED! :::\n");
         }
     }
 }
 
+// checks for error in memory allocation
 void check_buffer (const char *buffer) {
     if (!buffer) {
         fprintf(stderr,"₵: !Memory Allocation Error!");
@@ -184,14 +184,14 @@ char **cs_split_lines(char *line) {
     return tokens;
 }
 
+// fork from the parent process to execute non-built-in programs
 int cs_launch(char **args) {
-    printf("Falling through to main shell...\n");
     pid_t pid, wpid;
     int status;
 
-    pid = fork();
+    pid = fork(); // replicate parent process
     if (pid == 0) {
-        // Child process
+        // Child process - executing the named program `args[0` & list of arguments `args`
         if (execvp(args[0], args) == -1) {
             perror("cs");
         }
@@ -200,7 +200,7 @@ int cs_launch(char **args) {
         // Error forking
         perror("cs");
     } else {
-        // Parent process
+        // Parent process - await pid to exit / signal termination
         do {
             wpid = waitpid(pid, &status, WUNTRACED);
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
@@ -239,15 +239,16 @@ int cs_cd(char **args) {
 int cs_help(char **args)
 {
     int i;
-    printf("%s\n", msg);
-    printf("Welcome to ₵Shell.\n");
-    printf("The following are built in:\n");
+    printf("----------------------------------------------\n");
+    printf("Welcome to ₵Shell\n");
+    printf("----------------------------------------------\n");
+    printf("The following commands are currently built in:\n");
 
     for (i = 0; i < cs_num_builtins(); i++) {
-        printf("  %s\n", builtin_str[i]);
+        printf("  * %s\n", builtin_str[i]);
     }
-
-    printf("Use the man command for information on other programs.\n");
+    printf("----------------------------------------------\n\n");
+    printf("Please use `man` for more details on other programs.\n\n");
     return 1;
 }
 
@@ -255,8 +256,3 @@ int cs_exit(char **args)
 {
     return 0;
 }
-
-/* Straight forward approach using stdin.h provided `readline()`
-char *cs_readline() {
-
-}*/
